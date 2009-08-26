@@ -56,7 +56,7 @@
     </tr>
     <tr class="top-aligned-row">
       <td><strong>Last Update:</strong></td>
-      <td>Sun Feb 01 10:38:19 +0100 2009</td>
+      <td>Wed Aug 26 08:54:31 +0200 2009</td>
     </tr>
     </table>
   </div>
@@ -69,13 +69,13 @@
   <div id="contextContent">
 
     <div id="description">
-      <h1>scoped_search</h1>
+      <h1>Scoped search</h1>
 <p>
 The <b>scoped_search</b> Rails plugin makes it easy to search your
 ActiveRecord models. Searching is performed using a query string, which
-should be passed to the named_scope <b>search_for</b> that uses SQL
-<tt>LIKE %keyword%</tt> conditions for searching (ILIKE for Postgres). You
-can specify what fields should be used for searching.
+should be passed to the named_scope <tt>search_for</tt>. Based on a
+definition in what fields to look, it will build query conditions and
+return those as a named scope.
 </p>
 <h2>Installing</h2>
 <p>
@@ -87,89 +87,106 @@ Rails configuration in <tt>config/environment.rb</tt>:
   Rails::Initializer.run do |config|
     ...
     config.gem 'wvanbergen-scoped_search', :lib =&gt; 'scoped_search',
-                   source =&gt; 'http://gems.github.com/'
+                   :source =&gt; 'http://gems.github.com/'
   end
 </pre>
 <p>
 Run <tt>sudo rake gems:install</tt> to install the gem.
 </p>
 <p>
-Another alternative is to install scoped_search as a Rails plugin:
+Alternatively, install scoped_search as a Rails plugin:
 </p>
 <pre>
   script/plugin install git://github.com/wvanbergen/scoped_search.git
 </pre>
 <h2>Usage</h2>
 <p>
-First, you have to specify in what columns should be searched:
+Scoped search requires you to define the fields you want to search in:
 </p>
 <pre>
   class User &lt; ActiveRecord::Base
-    searchable_on :first_name, :last_name
+    scoped_search :on =&gt; [:first_name, :last_name]
   end
 </pre>
+<p>
+For more information about options and using fields from relations, see the
+project wiki on search definitions: <a
+href="http://wiki.github.com/wvanbergen/scoped_search/search-definition">wiki.github.com/wvanbergen/scoped_search/search-definition</a>
+</p>
 <p>
 Now, the <b>search_for</b> scope is available for queries. You should pass
 a query string to the scope. This can be empty or nil, in which case all no
 search conditions are set (and all records will be returned).
 </p>
 <pre>
-  User.search_for(params[:q]).each { |project| ... }
+  User.search_for('my search string').each { |user| ... }
 </pre>
 <p>
-You can also search on associate models. This works with <b>belongs_to</b>,
-<b>has_one</b>, <b>has_many</b>, <b>has_many :through</b>, and
-<b>HABTM</b>. For example if a User <b>has_many</b> Notes (title, content,
-created_at, updated_at)
-</p>
-<pre>
-  class User &lt; ActiveRecord::Base
-    has_many: notes
-    searchable_on :first_name, :last_name, :notes_title, :notes_content
-  end
-</pre>
-<p>
-The search query language is simple. It supports these constructs:
-</p>
-<ul>
-<li><b>words:</b> <tt>some search keywords</tt>
-
-</li>
-<li><b>phrases:</b> <tt>&quot;a single search phrase&quot;</tt>
-
-</li>
-<li><b>negation:</b> <tt>&quot;look for this&quot; -&quot;but do not look for
-this phrase and this&quot; -word</tt>
-
-</li>
-<li><b>OR words/phrases:</b> word/phrase OR word/phrase. Example:
-<tt>&quot;Hello World&quot; OR &quot;Hello Moon&quot;</tt>
-
-</li>
-<li><b>dates:</b> mm/dd/yyyy, dd/mm/yyyy, yyyy/mm/dd, yyyy-mm-dd
-
-</li>
-<li><b>date ranges:</b> &gt; date, &gt;= date, &lt; date, &lt;= date, date TO
-date. Examples: <tt>&gt; 30/05/1983</tt>, <tt>&lt; 2009-01-30</tt>
-
-</li>
-</ul>
-<p>
-This functionality is build on <tt>named_scope</tt>. The searchable_on
-statement creates a named_scope <b>search_for</b>. Because of this, you can
-actually chain the call with other scopes. For example, this can be very
-useful if you only want to search in projects that are accessible by a
-given user.
+The result is returned as <tt>named_scope</tt>. Because of this, you can
+actually chain the call with other scopes, or with will_paginate. An
+example:
 </p>
 <pre>
   class Project &lt; ActiveRecord::Base
     searchable_on :name, :description
-    named_scope :accessible_by, lambda { |user| ... }
+    named_scope :public, :conditions =&gt; {:public =&gt; true }
   end
 
-  # using chained named_scopes and will_paginate
-  Project.accessible_by(current_user).search_for(params[:q]).paginate(:page =&gt; params[:page], :include =&gt; :tasks)
+  # using chained named_scopes and will_paginate in your controller
+  Project.public.search_for(params[:q]).paginate(:page =&gt; params[:page], :include =&gt; :tasks)
 </pre>
+<p>
+More information about usage can be found in the project wiki: <a
+href="http://wiki.github.com/wvanbergen/scoped_search/usage">wiki.github.com/wvanbergen/scoped_search/usage</a>
+</p>
+<h2>Query language</h2>
+<p>
+The search query language is simple, but supports several constructs to
+support more complex queries:
+</p>
+<table>
+<tr><td valign="top">words:</td><td>require very word to be present, e.g.: <tt>some search keywords</tt>
+
+</td></tr>
+<tr><td valign="top">phrases:</td><td>use quotes for multi-word phrases, e.g. <tt>&quot;police car&quot;</tt>
+
+</td></tr>
+<tr><td valign="top">negation:</td><td>look for &quot;everything but&quot;, e.g. <tt>police -uniform</tt>,
+<tt>-&quot;police car&quot;</tt>, <tt>police NOT car</tt>
+
+</td></tr>
+<tr><td valign="top">logical keywords:</td><td>make logical constructs using AND, OR, &amp;&amp;, ||, &amp;, | operators,
+e.g. <tt>uniform OR car</tt>, <tt>scoped &amp;&amp; search</tt>
+
+</td></tr>
+<tr><td valign="top">parentheses:</td><td>to structure logic e.g. <tt>&quot;police AND (uniform OR car)&quot;</tt>
+
+</td></tr>
+<tr><td valign="top">comparison operators:</td><td>to search in numerical or temporal fields, e.g. <tt>&gt; 22</tt>, <tt>&lt;
+2009-01-01</tt>
+
+</td></tr>
+<tr><td valign="top">explicit fields:</td><td>search only in the given field. e.g. <tt>username = root</tt>,
+<tt>created_at &gt; 2009-01-01</tt>
+
+</td></tr>
+<tr><td valign="top">NULL checks:</td><td>using the <tt>set?</tt> and <tt>null?</tt> operator with a field name, e.g.
+<tt>null? graduated_at</tt>, <tt>set? parent_id</tt>
+
+</td></tr>
+</table>
+<p>
+A complex query example to look for Ruby on Rails programmers without cobol
+experience, over 18 years old, with a recently updated record and a
+non-lame nickname:
+</p>
+<pre>
+  (&quot;Ruby&quot; OR &quot;Rails&quot;) -cobol, age &gt;= 18, updated_at &gt; 2009-01-01 &amp;&amp; nickname !~ l33t
+</pre>
+<p>
+For more info, see the the project wiki: <a
+href="http://wiki.github.com/wvanbergen/scoped_search/query-language">wiki.github.com/wvanbergen/scoped_search/query-language</a>
+</p>
 <h2>Additional resources</h2>
 <ul>
 <li>Source code: <a
