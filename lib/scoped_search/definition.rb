@@ -115,7 +115,7 @@ module ScopedSearch
     def default_fields_for(value, operator = nil)
 
       column_types  = []
-      column_types += [:string, :text]                      if [nil, :like, :unlike, :ne, :eq].include?(operator)
+      column_types += [:string, :text]                      if [nil, :like, :unlike, :ne, :eq, :word].include?(operator)
       column_types += [:integer, :double, :float, :decimal] if value =~ NUMERICAL_REGXP
       column_types += [:datetime, :date, :timestamp]        if (DateTime.parse(value) rescue nil)
 

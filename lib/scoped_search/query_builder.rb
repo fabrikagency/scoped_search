@@ -69,7 +69,8 @@ module ScopedSearch
 
     # A hash that maps the operators of the query language with the corresponding SQL operator.
     SQL_OPERATORS = { :eq =>'=',  :ne => '<>', :like => 'LIKE', :unlike => 'NOT LIKE',
-                      :gt => '>', :lt =>'<',   :lte => '<=',    :gte => '>=' }
+                      :gt => '>', :lt =>'<',   :lte => '<=',    :gte => '>=',
+                      :word => 'REGEXP' }
     
     # Return the SQL operator to use given an operator symbol and field definition.
     #
@@ -141,6 +142,9 @@ module ScopedSearch
     def sql_test(field, operator, value, &block) # :yields: finder_option_type, value
       if [:like, :unlike].include?(operator) && value !~ /^\%/ && value !~ /\%$/
         yield(:parameter, "%#{value}%")
+        return "#{field.to_sql(operator, &block)} #{self.sql_operator(operator, field)} ?"
+      elsif [:word].include?(operator)
+        yield(:parameter, "[[:<:]#{value}[[:>:]]")
         return "#{field.to_sql(operator, &block)} #{self.sql_operator(operator, field)} ?"
       elsif field.temporal?
         return datetime_test(field, operator, value, &block)
